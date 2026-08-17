@@ -7,11 +7,12 @@ import { TRANSACTIONS, CHART_DAILY, CHART_WEEKLY, CHART_MONTHLY } from '../data/
 import type { Tx } from '../data/mock';
 import { fmt, downloadFile, toCsv } from '../lib/format';
 import { useApp } from '../state/AppContext';
+import { PageHead } from '../components/ui/shared';
 
 const TYPE_LABEL: Record<Tx['type'], string> = { mint: 'سك', send: 'إرسال', burn: 'حرق' };
 
 export function TransactionsScreen() {
-  const { toast } = useApp();
+  const { toast, go } = useApp();
   const [tab, setTab] = useState('all');
   const [q, setQ] = useState('');
   const [net, setNet] = useState('الكل');
@@ -74,7 +75,15 @@ export function TransactionsScreen() {
 
   return (
     <div>
-      <h1 className="section-title">سجل المعاملات</h1>
+      <PageHead
+        title="سجل المعاملات"
+        sub="جميع عمليات السك والإرسال والحرق مع الفلاتر والتصدير"
+        actions={
+          <button type="button" className="btn btn-sm btn-outline" onClick={() => go('analytics')}>
+            <Icon name="pie" size={14} /> التحليلات
+          </button>
+        }
+      />
 
       {/* شريط التصفية */}
       <div className="card mb">

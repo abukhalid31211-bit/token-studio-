@@ -4,6 +4,7 @@ import { Modal, ConfirmModal } from '../components/ui/Modal';
 import { Toggle, CopyBtn } from '../components/ui/primitives';
 import { WALLET, OTHER_WALLETS } from '../data/mock';
 import { useApp } from '../state/AppContext';
+import { PageHead } from '../components/ui/shared';
 
 interface MiniWallet {
   id: string;
@@ -13,7 +14,7 @@ interface MiniWallet {
 }
 
 export function WalletsScreen() {
-  const { toast } = useApp();
+  const { toast, go } = useApp();
   const [wallets, setWallets] = useState<MiniWallet[]>(OTHER_WALLETS);
   const [mainWallet, setMainWallet] = useState({ addr: WALLET.address, short: WALLET.short });
   const [disconnectOpen, setDisconnectOpen] = useState(false);
@@ -62,7 +63,20 @@ export function WalletsScreen() {
 
   return (
     <div style={{ maxWidth: 860 }}>
-      <h1 className="section-title">إدارة المحافظ</h1>
+      <PageHead
+        title="إدارة المحافظ"
+        sub="المحفظة الرئيسية والمحافظ المرتبطة وطرق الربط الخارجي"
+        actions={
+          <>
+            <button type="button" className="btn btn-sm btn-outline" onClick={() => go('wallet-import')}>
+              <Icon name="download" size={14} /> استيراد محفظة
+            </button>
+            <button type="button" className="btn btn-sm btn-primary" onClick={() => go('wallet-connect')}>
+              <Icon name="qr" size={14} /> ربط محفظة خارجية
+            </button>
+          </>
+        }
+      />
 
       {/* المحفظة الرئيسية */}
       <div className="wallet-main-card mb-lg">
@@ -86,6 +100,7 @@ export function WalletsScreen() {
         </div>
 
         <div className="row" style={{ justifyContent: 'center', gap: 18 }}>
+          <button type="button" className="btn-text-green" onClick={() => go('wallet-detail', { walletId: 'w1' })}>تفاصيل المحفظة</button>
           <button type="button" className="btn-text-blue" onClick={() => toast('info', 'فتح المستكشف 🔗')}>عرض في المستكشف</button>
           <button type="button" className="btn-text-red" onClick={() => setDisconnectOpen(true)}>قطع الاتصال</button>
         </div>
@@ -108,6 +123,7 @@ export function WalletsScreen() {
               </div>
             </div>
             <span className="muted small bold">{w.balance}</span>
+            <button type="button" className="btn-text-blue" onClick={() => go('wallet-detail', { walletId: w.id })}>تفاصيل</button>
             <button type="button" className="btn-text-green" onClick={() => makePrimary(w)}>تعيين رئيسية</button>
             <button type="button" className="btn-text-red" style={{ fontSize: 16 }} onClick={() => setDeleteTarget(w)} aria-label="حذف المحفظة">
               <Icon name="trash" size={15} />
@@ -121,7 +137,7 @@ export function WalletsScreen() {
         type="button"
         className="btn btn-block btn-lg"
         style={{ border: '2px dashed var(--primary)', background: 'var(--primary-soft)', color: 'var(--primary)' }}
-        onClick={() => setImportOpen(true)}
+        onClick={() => go('wallet-import')}
       >
         <Icon name="plus" size={18} /> إضافة محفظة
       </button>
@@ -140,7 +156,7 @@ export function WalletsScreen() {
           <Icon name="link" size={17} /> ربط TronLink
         </button>
         <button type="button" className="btn btn-block" style={{ borderColor: '#3b82f6', color: '#7cabff', justifyContent: 'flex-start' }}
-          onClick={() => setQrOpen(true)}>
+          onClick={() => go('wallet-connect')}>
           <Icon name="qr" size={17} /> ربط WalletConnect
         </button>
       </div>

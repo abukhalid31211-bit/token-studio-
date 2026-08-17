@@ -32,7 +32,8 @@ export function BatchRunModal({
   /** يُستدعى مرة واحدة عند اكتمال التنفيذ بنجاح */
   onDone?: (total: number) => void;
 }) {
-  const { toast } = useApp();
+  const { toast, setBatchRunning } = useApp();
+  const [minimized, setMinimized] = useState(false);
   const [phase, setPhase] = useState<'confirm' | 'running' | 'done'>('confirm');
   const [states, setStates] = useState<RowState[]>([]);
   const [txs, setTxs] = useState<string[]>([]);
@@ -134,9 +135,27 @@ export function BatchRunModal({
   const stateText = (s: RowState) =>
     s === 'done' ? '✅' : s === 'running' ? 'جارٍ الإرسال...' : s === 'failed' ? '❌' : s === 'skipped' ? '⏭ تم التخطي' : 'في الانتظار ⏸';
 
+  /* استعادة النافذة من الشريط السفلي */
+  useEffect(() => {
+    const onRestore = () => setMinimized(false);
+    window.addEventListener('ts:batch-restore', onRestore);
+    return () => window.removeEventListener('ts:batch-restore', onRestore);
+  }, []);
+
+  /* مزامنة الشريط السفلي أثناء التصغير — BAR-BATCH-RUNNING */
+  useEffect(() => {
+    if (!minimized) return;
+    if (phase === 'running') {
+      setBatchRunning({ label: `${verb} جماعي — ${rows.length} مستلمين`, done: doneCount, total: rows.length });
+    } else {
+      setBatchRunning(null);
+      setMinimized(false);
+    }
+  }, [minimized, phase, doneCount, rows.length, verb, setBatchRunning]);
+
   return (
     <Modal
-      open={open}
+      open={open && !minimized}
       onClose={phase === 'running' ? () => undefined : onClose}
       locked={phase === 'running'}
       size="lg"
@@ -199,6 +218,9 @@ export function BatchRunModal({
             </button>
             <button type="button" className="btn btn-sm btn-danger grow" onClick={cancelAll}>
               <Icon name="stop" size={13} /> إلغاء الكل
+            </button>
+            <button type="button" className="btn btn-sm btn-ghost" onClick={() => setMinimized(true)} title="متابعة التنفيذ في الخلفية">
+              <Icon name="minimize" size={13} /> تصغير
             </button>
           </div>
         </>
