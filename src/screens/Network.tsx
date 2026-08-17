@@ -5,9 +5,10 @@ import { Toggle } from '../components/ui/primitives';
 import { NETWORKS, TESTNETS, RPC_ENDPOINTS } from '../data/mock';
 import type { NetworkInfo } from '../data/mock';
 import { useApp } from '../state/AppContext';
+import { PageHead } from '../components/ui/shared';
 
 export function NetworkScreen() {
-  const { toast } = useApp();
+  const { toast, go } = useApp();
   const [selected, setSelected] = useState<NetworkInfo | null>(null);
   const [defaultNet, setDefaultNet] = useState('TRON');
   const [endpoints, setEndpoints] = useState(RPC_ENDPOINTS);
@@ -59,7 +60,20 @@ export function NetworkScreen() {
 
   return (
     <div>
-      <h1 className="section-title">إعداد الشبكة</h1>
+      <PageHead
+        title="إعداد الشبكة"
+        sub="اختر شبكة التشغيل، أو جرّب على شبكات الاختبار، أو أضف شبكة مخصصة"
+        actions={
+          <>
+            <button type="button" className="btn btn-sm btn-outline" onClick={() => go('network-test')}>
+              <Icon name="zap" size={14} /> شبكات الاختبار
+            </button>
+            <button type="button" className="btn btn-sm btn-primary" onClick={() => go('network-custom')}>
+              <Icon name="plus" size={14} strokeWidth={3} /> شبكة مخصصة
+            </button>
+          </>
+        }
+      />
 
       {/* الشبكات الرئيسية */}
       <div className="nets-grid">

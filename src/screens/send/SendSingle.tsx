@@ -3,7 +3,7 @@ import { Icon } from '../../lib/icons';
 import { Modal, Drawer } from '../../components/ui/Modal';
 import { ProgressRing, Accordion, Toggle, CopyBtn } from '../../components/ui/primitives';
 import { Burst } from '../../components/ui/Confetti';
-import { WALLET, ADDRESS_BOOK, NETWORKS } from '../../data/mock';
+import { WALLET, NETWORKS } from '../../data/mock';
 import type { NetworkId } from '../../data/mock';
 import { fmt, parseAmount, validateAddress, addressNetworkHint, copyText, randHex } from '../../lib/format';
 import { useApp } from '../../state/AppContext';
@@ -36,7 +36,8 @@ export function SendSingle({
   onSent: (n: number) => void;
   prefill: Prefill | null;
 }) {
-  const { toast } = useApp();
+  const { toast, addresses, params, go, setAddresses } = useApp();
+  const [bookQuery, setBookQuery] = useState('');
   const [addr, setAddr] = useState('');
   const [amount, setAmount] = useState('');
   const [chip, setChip] = useState<string | null>(null);
@@ -64,6 +65,12 @@ export function SendSingle({
       setChip(null);
     }
   }, [prefill]);
+
+  /* تعبئة من دفتر العناوين — go('send', { prefillAddr }) */
+  useEffect(() => {
+    if (params.prefillAddr) setAddr(params.prefillAddr);
+    if (params.prefillAmount) setAmount(params.prefillAmount);
+  }, [params.prefillAddr, params.prefillAmount]);
 
   useEffect(() => () => timers.current.forEach((t) => clearTimeout(t)), []);
 
@@ -321,11 +328,27 @@ export function SendSingle({
       {/* لوحة دفتر العناوين */}
       <Drawer open={bookOpen} onClose={() => setBookOpen(false)} title="دفتر العناوين">
         <div className="input-wrap mb">
-          <input className="input" placeholder="بحث..." />
+          <input className="input" placeholder="بحث بالاسم أو العنوان..." value={bookQuery} onChange={(e) => setBookQuery(e.target.value)} />
           <span className="input-icons"><span style={{ width: 32, height: 32, display: 'grid', placeItems: 'center', color: 'var(--text-3)' }}><Icon name="search" size={14} /></span></span>
         </div>
-        {ADDRESS_BOOK.map((a) => (
-          <div key={a.name} className="ab-row">
+        {addresses.filter((a) => {
+          const q = bookQuery.trim().toLowerCase();
+          return !q || a.name.toLowerCase().includes(q) || a.addr.toLowerCase().includes(q);
+        }).length === 0 && (
+          <div className="empty-state">
+            <div className="empty-illus"><Icon name="book" size={26} /></div>
+            <div className="empty-title">لا توجد جهات مطابقة</div>
+            <p className="empty-hint">أضف جهة جديدة إلى دفتر العناوين لتظهر هنا.</p>
+            <button type="button" className="btn btn-sm btn-primary mt" onClick={() => { setBookOpen(false); go('address-create'); }}>
+              <Icon name="plus" size={14} strokeWidth={3} /> إضافة جهة
+            </button>
+          </div>
+        )}
+        {addresses.filter((a) => {
+          const q = bookQuery.trim().toLowerCase();
+          return !q || a.name.toLowerCase().includes(q) || a.addr.toLowerCase().includes(q);
+        }).map((a) => (
+          <div key={a.id} className="ab-row">
             <div className="grow" style={{ minWidth: 0 }}>
               <div className="ab-name">{a.name}</div>
               <div className="ab-addr">{a.short}</div>
@@ -337,7 +360,29 @@ export function SendSingle({
           </div>
         ))}
         <div className="modal-sep" />
-        <button type="button" className="btn-text-green btn-block" onClick={() => { toast('success', 'تم حفظ العنوان في الدفتر 📒'); setBookOpen(false); }}>
+        <button
+          type="button"
+          className="btn-text-green btn-block"
+          onClick={() => {
+            if (!addr.trim()) { toast('error', 'لا يوجد عنوان لحفظه'); return; }
+            if (addresses.some((x) => x.addr === addr.trim())) { toast('warning', 'هذا العنوان محفوظ مسبقًا في الدفتر'); return; }
+            setAddresses((list) => [
+              ...list,
+              {
+                id: 'ab' + Date.now(),
+                name: 'جهة جديدة ' + (list.length + 1),
+                addr: addr.trim(),
+                short: addr.trim().slice(0, 6) + '...' + addr.trim().slice(-4),
+                net: network === 'TRON' ? 'TRC20' : 'ERC20',
+                note: 'أُضيفت من وحدة الإرسال',
+                lastUsed: 'الآن',
+                createdAt: new Date().toISOString().slice(0, 10),
+              },
+            ]);
+            toast('success', 'تم حفظ العنوان في الدفتر 📒');
+            setBookOpen(false);
+          }}
+        >
           + حفظ العنوان الحالي
         </button>
         <button type="button" className="btn btn-ghost btn-block mt-sm" onClick={() => setBookOpen(false)}>
