@@ -1084,7 +1084,8 @@ select.batch-input { font-family: var(--font); direction: rtl; appearance: none;
 @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } .hide-sm { display: none !important; } }
 
 /* ---------- الهيكل بدون شريط جانبي ---------- */
-.app-shell.chromeless { display: block; overflow: auto; }
+/* يبقى الحاوي flex (عمودي) حتى تتمدد .screen-wrap وتملأ الشاشة كاملة */
+.app-shell.chromeless { display: flex; flex-direction: column; overflow: auto; }
 
 /* ---------- الشريط الجانبي: المجموعات والدور ---------- */
 .nav-scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding-inline: 2px; }
