@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Icon } from '../../lib/icons';
 import { Toggle } from '../../components/ui/primitives';
 import { BatchRunModal } from '../../components/BatchRunModal';
+import { BatchReview } from '../../components/BatchReview';
 import type { BatchRow } from '../../components/BatchRunModal';
 import { fmt, validateAddress } from '../../lib/format';
 import { useApp } from '../../state/AppContext';
@@ -23,6 +24,8 @@ export function MintBatch({ onMinted }: { onMinted: (n: number) => void }) {
   const [delay, setDelay] = useState(false);
   const [failMode, setFailMode] = useState('skip');
   const [runOpen, setRunOpen] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const [execMode, setExecMode] = useState('متسلسل (أكثر أماناً)');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const total = rows.reduce((s, r) => s + r.amount, 0);
@@ -61,6 +64,33 @@ export function MintBatch({ onMinted }: { onMinted: (n: number) => void }) {
     };
     reader.readAsText(file);
   };
+
+  const failLabel = failMode === 'skip' ? 'تخطي ومتابعة' : failMode === 'stop' ? 'إيقاف الكل' : 'إعادة 3 مرات ثم تخطي';
+
+  /* SCR-MINT-BATCH-REVIEW */
+  if (reviewing) {
+    return (
+      <>
+        <BatchReview
+          kind="mint"
+          rows={rows}
+          execMode={execMode}
+          failMode={failLabel}
+          onBack={() => setReviewing(false)}
+          onCancel={() => setReviewing(false)}
+          onConfirm={() => setRunOpen(true)}
+        />
+        <BatchRunModal
+          open={runOpen}
+          title="تأكيد السك الجماعي"
+          rows={rows.map((r) => ({ ...r, addr: r.addr.slice(0, 5) + '...' + r.addr.slice(-4) }))}
+          verb="سك"
+          onDone={(t) => { onMinted(t); setReviewing(false); }}
+          onClose={() => setRunOpen(false)}
+        />
+      </>
+    );
+  }
 
   return (
     <div>
@@ -164,7 +194,7 @@ export function MintBatch({ onMinted }: { onMinted: (n: number) => void }) {
       <div className="row" style={{ gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <div className="field grow" style={{ minWidth: 220 }}>
           <div className="field-label">طريقة التنفيذ</div>
-          <select className="input">
+          <select className="input" value={execMode} onChange={(e) => setExecMode(e.target.value)}>
             <option>متسلسل (أكثر أماناً)</option>
             <option>متوازٍ (أسرع)</option>
             <option>عقد توزيع جماعي (الأرخص)</option>
@@ -200,8 +230,8 @@ export function MintBatch({ onMinted }: { onMinted: (n: number) => void }) {
         </div>
       </div>
 
-      <button type="button" className="btn btn-primary btn-lg btn-block glow mt" disabled={!allValid} onClick={() => setRunOpen(true)}>
-        ⚒️ سك جماعي
+      <button type="button" className="btn btn-primary btn-lg btn-block glow mt" disabled={!allValid} onClick={() => setReviewing(true)}>
+        <Icon name="check" size={17} strokeWidth={3} /> مراجعة السك الجماعي
       </button>
 
       <BatchRunModal

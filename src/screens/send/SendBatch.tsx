@@ -2,6 +2,7 @@ import { useRef, useState } from 'react';
 import { Icon } from '../../lib/icons';
 import { Toggle } from '../../components/ui/primitives';
 import { BatchRunModal } from '../../components/BatchRunModal';
+import { BatchReview } from '../../components/BatchReview';
 import { fmt, validateAddress } from '../../lib/format';
 import { useApp } from '../../state/AppContext';
 
@@ -30,6 +31,8 @@ export function SendBatch({ onSent }: { onSent: (n: number) => void }) {
   const [delay, setDelay] = useState(false);
   const [failMode, setFailMode] = useState('skip');
   const [runOpen, setRunOpen] = useState(false);
+  const [reviewing, setReviewing] = useState(false);
+  const [execMode, setExecMode] = useState('متسلسل (أكثر أماناً)');
   const fileRef = useRef<HTMLInputElement>(null);
 
   const total = rows.reduce((s, r) => s + r.amount, 0);
@@ -65,6 +68,33 @@ export function SendBatch({ onSent }: { onSent: (n: number) => void }) {
     };
     reader.readAsText(file);
   };
+
+  const failLabel = failMode === 'skip' ? 'تخطي ومتابعة' : failMode === 'stop' ? 'إيقاف الكل' : 'إعادة 3 مرات ثم تخطي';
+
+  /* SCR-SEND-BATCH-REVIEW */
+  if (reviewing) {
+    return (
+      <>
+        <BatchReview
+          kind="send"
+          rows={rows.map((r) => ({ id: r.id, addr: r.addr, amount: r.amount, net: r.net }))}
+          execMode={execMode}
+          failMode={failLabel}
+          onBack={() => setReviewing(false)}
+          onCancel={() => setReviewing(false)}
+          onConfirm={() => setRunOpen(true)}
+        />
+        <BatchRunModal
+          open={runOpen}
+          title="تأكيد الإرسال الجماعي"
+          rows={rows.map((r) => ({ id: r.id, addr: r.addr.slice(0, 5) + '...' + r.addr.slice(-4), amount: r.amount }))}
+          verb="إرسال"
+          onDone={(t) => { onSent(t); setReviewing(false); }}
+          onClose={() => setRunOpen(false)}
+        />
+      </>
+    );
+  }
 
   return (
     <div>
@@ -161,7 +191,7 @@ export function SendBatch({ onSent }: { onSent: (n: number) => void }) {
       <div className="row" style={{ gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
         <div className="field grow" style={{ minWidth: 220 }}>
           <div className="field-label">طريقة التنفيذ</div>
-          <select className="input">
+          <select className="input" value={execMode} onChange={(e) => setExecMode(e.target.value)}>
             <option>متسلسل (أكثر أماناً)</option>
             <option>متوازٍ (أسرع)</option>
             <option>عقد توزيع جماعي (الأرخص)</option>
@@ -197,8 +227,8 @@ export function SendBatch({ onSent }: { onSent: (n: number) => void }) {
         </div>
       </div>
 
-      <button type="button" className="btn btn-primary btn-lg btn-block glow mt" disabled={!allValid} onClick={() => setRunOpen(true)}>
-        إرسال جماعي <Icon name="zap" size={16} />
+      <button type="button" className="btn btn-primary btn-lg btn-block glow mt" disabled={!allValid} onClick={() => setReviewing(true)}>
+        <Icon name="check" size={17} strokeWidth={3} /> مراجعة الإرسال الجماعي
       </button>
 
       <BatchRunModal
