@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import { AppProvider, useApp, AUTH_SCREENS } from './state/AppContext';
 import type { ScreenId } from './state/AppContext';
@@ -117,19 +117,21 @@ function ScreenTransition() {
   const { screen, role, can } = useApp();
   const [current, setCurrent] = useState<ScreenId>(screen);
   const [leaving, setLeaving] = useState<ScreenId | null>(null);
-  const timer = useRef<number | null>(null);
 
+  /* عند تغيير الشاشة: الشاشة القديمة تصبح «مغادرة» والجديدة تصبح «الحالية» */
   useEffect(() => {
     if (screen !== current) {
       setLeaving(current);
       setCurrent(screen);
-      if (timer.current) clearTimeout(timer.current);
-      timer.current = window.setTimeout(() => setLeaving(null), 180);
     }
-    return () => {
-      if (timer.current) clearTimeout(timer.current);
-    };
   }, [screen, current]);
+
+  /* إزالة الشاشة المغادرة بعد انتهاء حركة الانزلاق */
+  useEffect(() => {
+    if (!leaving) return;
+    const t = window.setTimeout(() => setLeaving(null), 180);
+    return () => window.clearTimeout(t);
+  }, [leaving]);
 
   /* منع الوصول لقسم بلا صلاحية — SCR-STATE-NO-PERMISSION */
   const guarded = (id: ScreenId): ReactNode =>
