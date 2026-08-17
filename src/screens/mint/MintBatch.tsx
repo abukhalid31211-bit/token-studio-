@@ -1,0 +1,217 @@
+import { useRef, useState } from 'react';
+import { Icon } from '../../lib/icons';
+import { Toggle } from '../../components/ui/primitives';
+import { BatchRunModal } from '../../components/BatchRunModal';
+import type { BatchRow } from '../../components/BatchRunModal';
+import { fmt, validateAddress } from '../../lib/format';
+import { useApp } from '../../state/AppContext';
+
+let rowId = 100;
+
+const INITIAL_ROWS: BatchRow[] = [
+  { id: 1, addr: 'TQx7kR8vPm2nLq4wXz9bCdEfGhIjKlMn', amount: 10_000 },
+  { id: 2, addr: 'TVm3aK7rXw5pQn8yTz2cDeFgHiJkLmNo', amount: 50_000 },
+  { id: 3, addr: 'TRk9xY4tZq6mVb3sWn1fGhIjKlMnOpQr', amount: 25_000 },
+  { id: 4, addr: 'TAbc1Z5uYr7oWa4tXp2iJkLmNoPqRsTu', amount: 100_000 },
+  { id: 5, addr: 'TXyz7W6vZs8pXb5uYq3jKlMnOpQrStUv', amount: 5_000 },
+];
+
+export function MintBatch({ onMinted }: { onMinted: (n: number) => void }) {
+  const { toast } = useApp();
+  const [rows, setRows] = useState<BatchRow[]>(INITIAL_ROWS);
+  const [removing, setRemoving] = useState<number | null>(null);
+  const [delay, setDelay] = useState(false);
+  const [failMode, setFailMode] = useState('skip');
+  const [runOpen, setRunOpen] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const total = rows.reduce((s, r) => s + r.amount, 0);
+  const allValid = rows.length > 0 && rows.every((r) => validateAddress(r.addr, 'TRON') && r.amount > 0);
+
+  const removeRow = (id: number) => {
+    setRemoving(id);
+    setTimeout(() => {
+      setRows((rs) => rs.filter((r) => r.id !== id));
+      setRemoving(null);
+    }, 210);
+  };
+
+  const importCsv = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const lines = String(reader.result).split(/\r?\n/).filter(Boolean);
+      const parsed: BatchRow[] = [];
+      lines.forEach((line) => {
+        const parts = line.split(',').map((p) => p.trim().replace(/^"|"$/g, ''));
+        if (parts.length >= 2) {
+          const amt = Number(parts[1].replace(/[^\d]/g, ''));
+          parsed.push({ id: ++rowId, addr: parts[0], amount: Number.isFinite(amt) ? amt : 0 });
+        }
+      });
+      if (parsed.length === 0) {
+        toast('error', 'تعذر قراءة الملف — تأكد من صيغة CSV');
+        return;
+      }
+      /* تأثير متتالٍ: صف كل 50 مللي ثانية */
+      setRows([]);
+      parsed.forEach((row, i) => {
+        setTimeout(() => setRows((rs) => [...rs, row]), 50 * (i + 1));
+      });
+      toast('success', `تم استيراد ${parsed.length} صفاً 📄`);
+    };
+    reader.readAsText(file);
+  };
+
+  return (
+    <div>
+      {/* شريط الأدوات */}
+      <div className="row mb" style={{ gap: 10, flexWrap: 'wrap' }}>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".csv,text/csv"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) importCsv(f);
+            e.target.value = '';
+          }}
+        />
+        <button type="button" className="btn btn-outline btn-sm" onClick={() => fileRef.current?.click()}>
+          <Icon name="file" size={14} /> استيراد CSV
+        </button>
+        <button type="button" className="btn-text-green" onClick={() => setRows((r) => [...r, { id: ++rowId, addr: '', amount: 0 }])}>
+          + إضافة صف
+        </button>
+      </div>
+
+      {/* الجدول */}
+      <div className="card table-card mb">
+        <div className="table-wrap">
+          <table className="data">
+            <thead>
+              <tr>
+                <th style={{ width: 40 }}>#</th>
+                <th>العنوان</th>
+                <th style={{ width: 150 }}>الكمية (وحدة)</th>
+                <th style={{ width: 90 }}>الحالة</th>
+                <th style={{ width: 50 }}>حذف</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => {
+                const ok = validateAddress(r.addr, 'TRON');
+                return (
+                  <tr key={r.id} className={`batch-row-enter ${removing === r.id ? 'batch-row-exit' : ''}`}>
+                    <td>{i + 1}</td>
+                    <td>
+                      <div className="row" style={{ gap: 7 }}>
+                        <input
+                          className={`batch-input ${r.addr ? (ok ? 'valid' : 'invalid') : ''}`}
+                          value={r.addr}
+                          placeholder="T..."
+                          onChange={(e) => setRows((rs) => rs.map((x) => (x.id === r.id ? { ...x, addr: e.target.value } : x)))}
+                        />
+                        {r.addr && <span className={`valid-mark ${ok ? 'ok' : 'bad'}`}>{ok ? '✓' : '✗'}</span>}
+                      </div>
+                    </td>
+                    <td>
+                      <input
+                        className="batch-input"
+                        value={r.amount || ''}
+                        inputMode="numeric"
+                        placeholder="0"
+                        onChange={(e) =>
+                          setRows((rs) => rs.map((x) => (x.id === r.id ? { ...x, amount: Number(e.target.value.replace(/[^\d]/g, '')) || 0 } : x)))
+                        }
+                      />
+                    </td>
+                    <td className="faint small">{ok && r.amount > 0 ? 'جاهز' : 'ناقِص'}</td>
+                    <td>
+                      <button type="button" className="btn-text-red" style={{ fontSize: 15 }} onClick={() => removeRow(r.id)} aria-label="حذف الصف">
+                        <Icon name="trash" size={15} />
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        <button
+          type="button"
+          className="btn btn-block"
+          style={{ border: '1.5px dashed var(--primary)', background: 'var(--primary-soft)', color: 'var(--primary)', borderRadius: 0 }}
+          onClick={() => setRows((r) => [...r, { id: ++rowId, addr: '', amount: 0 }])}
+        >
+          <Icon name="plus" size={14} /> إضافة صف
+        </button>
+      </div>
+
+      {/* شريط الملخص */}
+      <div className="card darker mb">
+        <div className="row" style={{ flexWrap: 'wrap', gap: 8, fontSize: 13, fontWeight: 700 }}>
+          <span>المستلمون: <b className="green">{rows.length}</b></span>
+          <span className="faint">•</span>
+          <span>الإجمالي: <b className="green">{fmt(total)} وحدة</b></span>
+          <span className="faint">•</span>
+          <span>الغاز: <b>~{Math.max(5, rows.length * 8)} TRX</b></span>
+          <span className="faint">•</span>
+          <span>الوقت: <b>~{rows.length * 5} ثانية</b></span>
+        </div>
+      </div>
+
+      <div className="row" style={{ gap: 16, flexWrap: 'wrap', alignItems: 'flex-start' }}>
+        <div className="field grow" style={{ minWidth: 220 }}>
+          <div className="field-label">طريقة التنفيذ</div>
+          <select className="input">
+            <option>متسلسل (أكثر أماناً)</option>
+            <option>متوازٍ (أسرع)</option>
+            <option>عقد توزيع جماعي (الأرخص)</option>
+          </select>
+        </div>
+        <div className="field grow" style={{ minWidth: 220 }}>
+          <div className="field-label">التأخير بين المعاملات</div>
+          <div className="row" style={{ gap: 10 }}>
+            <Toggle on={delay} onChange={setDelay} label="تأخير عشوائي" />
+            {delay && (
+              <select className="input" style={{ maxWidth: 140, animation: 'expandIn 0.2s ease' }}>
+                <option>1–10 ثوانٍ</option>
+                <option>10–30 ثانية</option>
+              </select>
+            )}
+          </div>
+        </div>
+        <div className="field grow" style={{ minWidth: 240 }}>
+          <div className="field-label">عند الفشل:</div>
+          <div className="radio-group horizontal">
+            {[
+              { id: 'skip', label: 'تخطي ومتابعة' },
+              { id: 'stop', label: 'إيقاف الكل' },
+              { id: 'retry', label: 'إعادة 3 مرات ثم تخطي' },
+            ].map((o) => (
+              <label key={o.id} className="radio-opt">
+                <input type="radio" checked={failMode === o.id} onChange={() => setFailMode(o.id)} />
+                <span className="r-mark" />
+                <span className="r-label">{o.label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <button type="button" className="btn btn-primary btn-lg btn-block glow mt" disabled={!allValid} onClick={() => setRunOpen(true)}>
+        ⚒️ سك جماعي
+      </button>
+
+      <BatchRunModal
+        open={runOpen}
+        title="تأكيد السك الجماعي"
+        rows={rows.map((r) => ({ ...r, addr: r.addr.slice(0, 5) + '...' + r.addr.slice(-4) }))}
+        verb="سك"
+        onDone={(t) => onMinted(t)}
+        onClose={() => setRunOpen(false)}
+      />
+    </div>
+  );
+}
